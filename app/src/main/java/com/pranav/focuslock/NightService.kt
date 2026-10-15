@@ -71,6 +71,7 @@ class NightService : Service() {
     private var overlayShown = false
     private var forced = false
     private var lastPkg: String? = null
+    private var firstUsagePoll = true
 
     private val selfCheck = object : Runnable {
         override fun run() {
@@ -301,7 +302,11 @@ class NightService : Service() {
 
             val usm = getSystemService(UsageStatsManager::class.java) ?: return
             val now = System.currentTimeMillis()
-            val events = usm.queryEvents(now - 10_000L, now)
+            // First poll looks further back so a call already in progress at window start
+            // is recognized immediately instead of being covered.
+            val lookback = if (firstUsagePoll) 300_000L else 10_000L
+            firstUsagePoll = false
+            val events = usm.queryEvents(now - lookback, now)
             val e = UsageEvents.Event()
             var last: String? = null
             while (events.hasNextEvent()) {
