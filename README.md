@@ -43,6 +43,7 @@ else — launcher, Settings, other apps — gets the night shell drawn over it.
 3. Set the window times (default 23:00 → 06:00) and your 4-digit exit PIN.
 4. Tap **Choose apps…** (Allowed at night) and tick anything you want usable
    during night mode. Phone calls are always allowed and can't be unchecked.
+   Ticked apps appear as shortcut icons on the night screen.
 5. Tap **Preview 2 min** to see it now.
 
 ## Ending night mode early

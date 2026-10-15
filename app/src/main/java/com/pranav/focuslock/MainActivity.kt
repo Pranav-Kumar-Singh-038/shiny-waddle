@@ -185,7 +185,8 @@ class MainActivity : Activity() {
         allowedSummary.text = if (extraNames.isEmpty()) {
             "Always allowed: Phone. No other apps allowed."
         } else {
-            "Always allowed: Phone. Also allowed: ${extraNames.joinToString(", ")}"
+            "Always allowed: Phone. Also allowed: ${extraNames.joinToString(", ")}\n" +
+                "They appear as shortcut icons on the night screen."
         }
 
         permsColumn.removeAllViews()

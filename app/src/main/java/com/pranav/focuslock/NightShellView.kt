@@ -6,10 +6,12 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.os.BatteryManager
 import android.os.Handler
 import android.os.Looper
+import android.text.TextUtils
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.KeyEvent
@@ -44,6 +46,11 @@ class NightShellView(context: Context) : FrameLayout(context) {
     private val pinPanel: LinearLayout
     private val dotsRow: LinearLayout
     private val pinError: TextView
+    private val shortcutsWrap: LinearLayout
+
+    private val iconCache = HashMap<String, Drawable>()
+    private val labelCache = HashMap<String, CharSequence>()
+    private var lastShortcutPkgs: List<String>? = null
 
     private var entered = ""
     private var batteryRegistered = false
@@ -171,6 +178,19 @@ class NightShellView(context: Context) : FrameLayout(context) {
         )
         plp.topMargin = dp(12)
         mainColumn.addView(phoneLabel, plp)
+
+        // One-tap shortcuts for the apps the user allows at night.
+        shortcutsWrap = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+        }
+        val swLp = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        )
+        swLp.topMargin = dp(26)
+        mainColumn.addView(shortcutsWrap, swLp)
+        refreshShortcuts()
 
         val hint = TextView(context).apply {
             text = "Emergency calls work from the dialer"
@@ -322,6 +342,142 @@ class NightShellView(context: Context) : FrameLayout(context) {
             context.startActivity(Intent(Intent.ACTION_DIAL).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         } catch (t: Throwable) {
             Logx.add("dialer launch failed: ${t.message}")
+        }
+    }
+
+    /**
+     * Rebuilds the shortcut row for the user's allowed apps. Cheap no-op when the
+     * allowed set hasn't changed, so it is also called whenever the shell reappears.
+     */
+    fun refreshShortcuts() {
+        val pkgs = Prefs.allowedPackages
+            .filter { it !in AllowedApps.MANDATORY && it != context.packageName }
+            .sorted()
+        if (pkgs == lastShortcutPkgs) return
+        lastShortcutPkgs = pkgs
+        shortcutsWrap.removeAllViews()
+        if (pkgs.isEmpty()) {
+            shortcutsWrap.visibility = View.GONE
+            return
+        }
+        val pm = context.packageManager
+        val entries = ArrayList<Triple<String, CharSequence, Drawable?>>()
+        for (p in pkgs) {
+            val launchable = try {
+                pm.getLaunchIntentForPackage(p) != null
+            } catch (_: Throwable) {
+                false
+            }
+            if (!launchable) continue
+            val label = labelCache.getOrPut(p) {
+                try {
+                    pm.getApplicationLabel(pm.getApplicationInfo(p, 0))
+                } catch (_: Throwable) {
+                    p
+                }
+            }
+            var icon = iconCache[p]
+            if (icon == null) {
+                icon = try {
+                    pm.getApplicationIcon(p)
+                } catch (_: Throwable) {
+                    null
+                }
+                if (icon != null) iconCache[p] = icon
+            }
+            entries.add(Triple(p, label, icon))
+        }
+        if (entries.isEmpty()) {
+            shortcutsWrap.visibility = View.GONE
+            return
+        }
+        shortcutsWrap.visibility = View.VISIBLE
+        val maxApps = 8
+        var i = 0
+        while (i < entries.size && i < maxApps) {
+            val row = LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER
+            }
+            var j = i
+            while (j < entries.size && j < i + 4 && j < maxApps) {
+                val (pkg, label, icon) = entries[j]
+                row.addView(shortcutTile(pkg, label, icon))
+                j++
+            }
+            val lp = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            if (i > 0) lp.topMargin = dp(12)
+            shortcutsWrap.addView(row, lp)
+            i += 4
+        }
+    }
+
+    private fun shortcutTile(pkg: String, label: CharSequence, icon: Drawable?): View {
+        val col = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+        }
+        val circle = FrameLayout(context).apply {
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(0xFF1A1F27.toInt())
+            }
+            setOnClickListener { launchPackage(pkg) }
+        }
+        if (icon != null) {
+            val iv = ImageView(context).apply { setImageDrawable(icon) }
+            circle.addView(
+                iv,
+                FrameLayout.LayoutParams(dp(34), dp(34)).apply { gravity = Gravity.CENTER }
+            )
+        } else {
+            val letter = TextView(context).apply {
+                text = label.toString().take(1).uppercase()
+                setTextColor(Color.WHITE)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
+            }
+            circle.addView(
+                letter,
+                FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    FrameLayout.LayoutParams.WRAP_CONTENT
+                ).apply { gravity = Gravity.CENTER }
+            )
+        }
+        col.addView(
+            circle,
+            LinearLayout.LayoutParams(dp(60), dp(60)).apply { gravity = Gravity.CENTER_HORIZONTAL }
+        )
+        val labelView = TextView(context).apply {
+            text = label
+            setTextColor(0xFF9AA4B2.toInt())
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
+            gravity = Gravity.CENTER
+        }
+        val llp = LinearLayout.LayoutParams(dp(70), LinearLayout.LayoutParams.WRAP_CONTENT)
+        llp.topMargin = dp(8)
+        col.addView(labelView, llp)
+        col.layoutParams = LinearLayout.LayoutParams(
+            dp(74),
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            marginStart = dp(4)
+            marginEnd = dp(4)
+        }
+        return col
+    }
+
+    private fun launchPackage(pkg: String) {
+        try {
+            val i = context.packageManager.getLaunchIntentForPackage(pkg) ?: return
+            context.startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        } catch (t: Throwable) {
+            Logx.add("launch failed: $pkg")
         }
     }
 

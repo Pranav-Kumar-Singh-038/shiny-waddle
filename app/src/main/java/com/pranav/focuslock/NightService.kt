@@ -263,6 +263,7 @@ class NightService : Service() {
                 WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv() and
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv()
             v.visibility = View.VISIBLE
+            v.refreshShortcuts()
         } else {
             p.flags = p.flags or
                 WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
