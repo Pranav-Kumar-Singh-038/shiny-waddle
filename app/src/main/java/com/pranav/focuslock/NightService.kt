@@ -195,18 +195,12 @@ class NightService : Service() {
             Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        val exitTonight = PendingIntent.getService(
-            this, 1,
-            Intent(this, NightService::class.java).setAction(ACTION_EXIT_TONIGHT),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
         return Notification.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_moon)
             .setContentTitle("Night mode · calls only")
             .setContentText("Ends at ${Format.minutes(Prefs.endMinutes)}")
             .setContentIntent(open)
             .setOngoing(true)
-            .addAction(0, "End for tonight", exitTonight)
             .build()
     }
 

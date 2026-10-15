@@ -15,14 +15,11 @@ import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
-import android.text.InputFilter
-import android.text.InputType
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
-import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.Switch
@@ -36,7 +33,6 @@ class MainActivity : Activity() {
     private lateinit var enableSwitch: Switch
     private lateinit var startButton: Button
     private lateinit var endButton: Button
-    private lateinit var pinInput: EditText
     private lateinit var allowedSummary: TextView
     private lateinit var permsColumn: LinearLayout
     private lateinit var logView: TextView
@@ -120,34 +116,14 @@ class MainActivity : Activity() {
         tslp.topMargin = dp(4)
         col.addView(tests, tslp)
 
-        col.addView(header("Exit PIN"))
-        val pinRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        pinInput = EditText(this).apply {
-            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
-            filters = arrayOf<InputFilter>(InputFilter.LengthFilter(4))
-            setText(Prefs.pin)
-            setTextColor(Color.WHITE)
-            hint = "4 digits"
-        }
-        pinRow.addView(pinInput, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        val savePin = Button(this).apply {
-            text = "Save"
-            setOnClickListener {
-                val v = pinInput.text.toString()
-                if (v.length == 4) {
-                    Prefs.pin = v
-                    toast("PIN saved")
-                } else {
-                    toast("PIN must be 4 digits")
-                }
-            }
-        }
-        pinRow.addView(savePin)
-        col.addView(pinRow)
-        col.addView(body("Used to end night mode early from the night screen. Default: 1234", 12f, 0xFF5A6472.toInt()))
+        col.addView(header("Leaving night mode early"))
+        col.addView(body(
+            "No PIN: on the night screen, tap the empty screen ${NightShellView.TAPS_TO_EXIT} times " +
+                "in a row, never pausing more than ${NightShellView.TAP_RESET_MS / 1000} seconds. " +
+                "Any longer pause resets the count to zero.",
+            12f,
+            0xFF5A6472.toInt()
+        ))
 
         col.addView(header("Allowed at night"))
         col.addView(Button(this).apply {

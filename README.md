@@ -15,7 +15,7 @@ No root, no factory reset, no account changes, no adb required to use it.
 | `ScheduleEngine` | Computes the overnight window (crossing midnight, DST-safe) and keeps exact `AlarmManager` alarms armed for the next boundary. Also arms a 15-minute heartbeat inside the window. |
 | `AlarmReceiver` / `SystemEventReceiver` | Start/stop night mode at boundaries; survive reboots, time-zone changes and app updates (direct-boot aware). |
 | `NightService` | Foreground service (`specialUse`). Owns the overlay. Decides visibility from foreground-app signals. Self-checks every 30 s as a safety net. |
-| `NightShellView` | The night screen itself: black, big clock, date, battery, one Phone button, discreet PIN exit. Rendered as `TYPE_APPLICATION_OVERLAY`. |
+| `NightShellView` | The night screen itself: black, big clock, date, battery, one Phone button, shortcut icons for allowed apps, and a 1000-tap escape. Rendered as `TYPE_APPLICATION_OVERLAY`. |
 | `LockAccessibilityService` | Watches `TYPE_WINDOW_STATE_CHANGED` events and tells the service which app is in the foreground. Also collapses the notification shade / recents when they open at night. |
 | UsageStats poller (inside the service) | Fallback foreground detector (~1.5 s interval) in case accessibility misses an event. |
 
@@ -40,7 +40,7 @@ else — launcher, Settings, other apps — gets the night shell drawn over it.
      *App info → ⋮ → Allow restricted settings* first.
    - **Usage access** (optional fallback detector).
    - **Notifications**, **Ignore battery optimization**.
-3. Set the window times (default 23:00 → 06:00) and your 4-digit exit PIN.
+3. Set the window times (default 23:00 → 06:00).
 4. Tap **Choose apps…** (Allowed at night) and tick anything you want usable
    during night mode. Phone calls are always allowed and can't be unchecked.
    Ticked apps appear as shortcut icons on the night screen.
@@ -48,9 +48,11 @@ else — launcher, Settings, other apps — gets the night shell drawn over it.
 
 ## Ending night mode early
 
-- From the night screen: tap the small lock icon (bottom-right) and enter your PIN.
-- Or from the ongoing notification: **End for tonight**.
-- Either way, the rest of tonight is skipped and the schedule resumes tomorrow.
+- There is no PIN and no one-tap exit. On the night screen, tap any empty area
+  **1,000 times in a row**; the counter (bottom of the screen) resets to zero
+  whenever more than 2 seconds pass between taps.
+- When the count reaches 1,000, the rest of tonight is skipped and the schedule
+  resumes tomorrow.
 
 ## Build
 

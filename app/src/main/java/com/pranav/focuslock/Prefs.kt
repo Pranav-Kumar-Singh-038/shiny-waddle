@@ -45,12 +45,6 @@ object Prefs {
             s().edit().putInt("end_min", v).apply()
         }
 
-    var pin: String
-        get() = s().getString("pin", "1234") ?: "1234"
-        set(v) {
-            s().edit().putString("pin", v).apply()
-        }
-
     /** While now < snoozeUntilMs, night mode will not start (used by "end for tonight"). */
     var snoozeUntilMs: Long
         get() = s().getLong("snooze_until", 0L)

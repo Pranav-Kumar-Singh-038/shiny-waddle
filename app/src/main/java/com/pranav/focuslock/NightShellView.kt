@@ -11,6 +11,7 @@ import android.graphics.drawable.GradientDrawable
 import android.os.BatteryManager
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.text.TextUtils
 import android.util.TypedValue
 import android.view.Gravity
@@ -25,11 +26,20 @@ import java.time.format.DateTimeFormatter
 
 /**
  * The full-screen "ultra power saving" style night screen.
- * Black, minimal, big clock, one Phone button, an unobtrusive PIN exit.
+ * Black, minimal, big clock, one Phone button, shortcut icons for allowed apps,
+ * and a deliberately tedious tap-count escape (no PIN).
  */
 class NightShellView(context: Context) : FrameLayout(context) {
 
-    /** Invoked when the correct PIN has been entered. */
+    companion object {
+        /** How many taps end night mode early. Deliberately tedious. */
+        const val TAPS_TO_EXIT = 1000
+
+        /** A pause longer than this between taps resets the streak to zero. */
+        const val TAP_RESET_MS = 2_000L
+    }
+
+    /** Invoked when the tap-count escape is completed. */
     var onExitRequested: (() -> Unit)? = null
 
     private val handler = Handler(Looper.getMainLooper())
@@ -38,22 +48,20 @@ class NightShellView(context: Context) : FrameLayout(context) {
     private val dateFmt = DateTimeFormatter.ofPattern("EEEE, d MMMM")
 
     private val mainColumn: LinearLayout
-    private val exitButton: ImageView
     private val clockView: TextView
     private val ampmView: TextView
     private val dateView: TextView
     private val batteryView: TextView
-    private val pinPanel: LinearLayout
-    private val dotsRow: LinearLayout
-    private val pinError: TextView
     private val shortcutsWrap: LinearLayout
+    private val tapView: TextView
 
     private val iconCache = HashMap<String, Drawable>()
     private val labelCache = HashMap<String, CharSequence>()
     private var lastShortcutPkgs: List<String>? = null
 
-    private var entered = ""
     private var batteryRegistered = false
+    private var tapCount = 0
+    private var lastTapMs = 0L
 
     private val batteryReceiver = object : BroadcastReceiver() {
         override fun onReceive(c: Context?, i: Intent?) = updateBattery(i)
@@ -204,99 +212,20 @@ class NightShellView(context: Context) : FrameLayout(context) {
         hlp.topMargin = dp(30)
         mainColumn.addView(hint, hlp)
 
-        // Discreet exit button (bottom-right)
-        exitButton = ImageView(context).apply {
-            setImageResource(R.drawable.ic_lock)
-            setColorFilter(0xFF3A4150.toInt())
-            setPadding(dp(14), dp(14), dp(14), dp(14))
-            setOnClickListener { showPin(true) }
+        // Escape counter (bottom-centre): tap the empty screen many times in a row.
+        tapView = TextView(context).apply {
+            setTextColor(0xFF3F4753.toInt())
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            visibility = View.INVISIBLE
         }
-        val exitLp = LayoutParams(dp(56), dp(56)).apply {
-            gravity = Gravity.BOTTOM or Gravity.END
-            rightMargin = dp(16)
-            bottomMargin = dp(28)
+        val tapLp = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply {
+            gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+            bottomMargin = dp(32)
         }
-        addView(exitButton, exitLp)
+        addView(tapView, tapLp)
 
-        // ------- PIN panel -------
-        pinPanel = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
-            setBackgroundColor(Color.BLACK)
-            setPadding(dp(32), dp(96), dp(32), dp(48))
-            isClickable = true
-            visibility = View.GONE
-        }
-        pinPanel.addView(TextView(context).apply {
-            text = "Enter PIN"
-            setTextColor(Color.WHITE)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 24f)
-        })
-        pinError = TextView(context).apply {
-            text = " "
-            setTextColor(0xFFE5534B.toInt())
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
-        }
-        val peLp = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.WRAP_CONTENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        )
-        peLp.topMargin = dp(12)
-        pinPanel.addView(pinError, peLp)
-
-        dotsRow = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-        }
-        repeat(4) {
-            val dot = View(context).apply {
-                background = GradientDrawable().apply {
-                    shape = GradientDrawable.OVAL
-                    setColor(0xFF2A303C.toInt())
-                }
-            }
-            val dlp = LinearLayout.LayoutParams(dp(16), dp(16))
-            dlp.marginStart = dp(10)
-            dlp.marginEnd = dp(10)
-            dotsRow.addView(dot, dlp)
-        }
-        val drLp = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.WRAP_CONTENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        )
-        drLp.topMargin = dp(32)
-        pinPanel.addView(dotsRow, drLp)
-
-        pinPanel.addView(View(context), LinearLayout.LayoutParams(1, dp(28)))
-
-        val keys = listOf(
-            listOf("1", "2", "3"),
-            listOf("4", "5", "6"),
-            listOf("7", "8", "9"),
-            listOf("Cancel", "0", "⌫")
-        )
-        for (row in keys) {
-            val rowLayout = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
-            for (k in row) {
-                val key = TextView(context).apply {
-                    text = k
-                    gravity = Gravity.CENTER
-                    setTextColor(if (k.length == 1) Color.WHITE else 0xFF9AA4B2.toInt())
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, if (k.length == 1) 30f else 15f)
-                    isClickable = true
-                    setOnClickListener { pressKey(k) }
-                }
-                rowLayout.addView(key, LinearLayout.LayoutParams(0, dp(72), 1f))
-            }
-            val rLp = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-            rLp.topMargin = dp(2)
-            pinPanel.addView(rowLayout, rLp)
-        }
-
-        addView(pinPanel, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+        // Count taps on any empty area of the night screen.
+        setOnClickListener { countTap() }
 
         updateClock()
     }
@@ -328,10 +257,7 @@ class NightShellView(context: Context) : FrameLayout(context) {
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        if (keyCode == KeyEvent.KEYCODE_BACK) {
-            if (pinPanel.visibility == View.VISIBLE) showPin(false)
-            return true // swallow back: this screen is the night mode
-        }
+        if (keyCode == KeyEvent.KEYCODE_BACK) return true // swallow back: this screen is the night mode
         return super.onKeyDown(keyCode, event)
     }
 
@@ -481,44 +407,21 @@ class NightShellView(context: Context) : FrameLayout(context) {
         }
     }
 
-    private fun showPin(show: Boolean) {
-        pinPanel.visibility = if (show) View.VISIBLE else View.GONE
-        mainColumn.visibility = if (show) View.GONE else View.VISIBLE
-        exitButton.visibility = if (show) View.GONE else View.VISIBLE
-        entered = ""
-        pinError.text = " "
-        updateDots()
-    }
-
-    private fun pressKey(k: String) {
-        when (k) {
-            "⌫" -> if (entered.isNotEmpty()) entered = entered.dropLast(1)
-            "Cancel" -> {
-                showPin(false)
-                return
-            }
-            else -> if (entered.length < 4) entered += k
-        }
-        pinError.text = " "
-        updateDots()
-        if (entered.length == 4) {
-            if (entered == Prefs.pin) {
-                Logx.add("pin accepted: ending for tonight")
-                onExitRequested?.invoke()
-            } else {
-                pinError.text = "Wrong PIN"
-                entered = ""
-                updateDots()
-            }
-        }
-    }
-
-    private fun updateDots() {
-        for (i in 0 until dotsRow.childCount) {
-            val filled = i < entered.length
-            (dotsRow.getChildAt(i).background as? GradientDrawable)?.setColor(
-                if (filled) 0xFFEDEFF3.toInt() else 0xFF2A303C.toInt()
-            )
+    /**
+     * The deliberate escape: TAPS_TO_EXIT taps, each within TAP_RESET_MS of the
+     * previous one. Any longer pause resets the streak to zero.
+     */
+    private fun countTap() {
+        val now = SystemClock.uptimeMillis()
+        if (now - lastTapMs > TAP_RESET_MS) tapCount = 0
+        lastTapMs = now
+        tapCount++
+        tapView.visibility = View.VISIBLE
+        tapView.text = "$tapCount / $TAPS_TO_EXIT"
+        if (tapCount >= TAPS_TO_EXIT) {
+            Logx.add("tap escape: $TAPS_TO_EXIT taps")
+            tapCount = 0
+            onExitRequested?.invoke()
         }
     }
 
