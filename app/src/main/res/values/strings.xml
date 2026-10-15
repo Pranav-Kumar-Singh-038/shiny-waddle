@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Focus Lock</string>
+    <string name="a11y_desc">Focus Lock night mode watches which app is in the foreground between 11 PM and 6 AM and sends you back to the Focus Lock screen, so only calls get through.</string>
+</resources>
