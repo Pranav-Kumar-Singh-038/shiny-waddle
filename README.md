@@ -19,9 +19,9 @@ No root, no factory reset, no account changes, no adb required to use it.
 | `LockAccessibilityService` | Watches `TYPE_WINDOW_STATE_CHANGED` events and tells the service which app is in the foreground. Also collapses the notification shade / recents when they open at night. |
 | UsageStats poller (inside the service) | Fallback foreground detector (~1.5 s interval) in case accessibility misses an event. |
 
-Policy: a foreground package is *allowed* only if it is in `AllowedApps.PACKAGES`
-(Pixel dialer / in-call UI). Anything else — launcher, Settings, other apps —
-gets the night shell drawn over it.
+Policy: a foreground package is *allowed* only if it is in the always-allowed
+dialer set or in the user's allow-list (Settings → **Choose apps…**). Anything
+else — launcher, Settings, other apps — gets the night shell drawn over it.
 
 ## Phone-only mode details
 
@@ -41,7 +41,9 @@ gets the night shell drawn over it.
    - **Usage access** (optional fallback detector).
    - **Notifications**, **Ignore battery optimization**.
 3. Set the window times (default 23:00 → 06:00) and your 4-digit exit PIN.
-4. Tap **Preview 2 min** to see it now.
+4. Tap **Choose apps…** (Allowed at night) and tick anything you want usable
+   during night mode. Phone calls are always allowed and can't be unchecked.
+5. Tap **Preview 2 min** to see it now.
 
 ## Ending night mode early
 

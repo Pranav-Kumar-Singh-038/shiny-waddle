@@ -57,4 +57,11 @@ object Prefs {
         set(v) {
             s().edit().putLong("snooze_until", v).apply()
         }
+
+    /** Additional apps the user allows during night mode (dialer is always allowed separately). */
+    var allowedPackages: Set<String>
+        get() = s().getStringSet("allowed_pkgs", emptySet()) ?: emptySet()
+        set(v) {
+            s().edit().putStringSet("allowed_pkgs", v).apply()
+        }
 }

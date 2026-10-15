@@ -37,6 +37,7 @@ class MainActivity : Activity() {
     private lateinit var startButton: Button
     private lateinit var endButton: Button
     private lateinit var pinInput: EditText
+    private lateinit var allowedSummary: TextView
     private lateinit var permsColumn: LinearLayout
     private lateinit var logView: TextView
 
@@ -148,6 +149,14 @@ class MainActivity : Activity() {
         col.addView(pinRow)
         col.addView(body("Used to end night mode early from the night screen. Default: 1234", 12f, 0xFF5A6472.toInt()))
 
+        col.addView(header("Allowed at night"))
+        col.addView(Button(this).apply {
+            text = "Choose apps…"
+            setOnClickListener { startActivity(Intent(this@MainActivity, AppPickerActivity::class.java)) }
+        })
+        allowedSummary = body("", 12f, 0xFF5A6472.toInt())
+        col.addView(allowedSummary)
+
         col.addView(header("Permissions"))
         permsColumn = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         col.addView(permsColumn)
@@ -171,6 +180,13 @@ class MainActivity : Activity() {
         statusView.setTextColor(if (inWindow) 0xFF66D19E.toInt() else 0xFF9AA4B2.toInt())
         startButton.text = "From: ${Format.minutes(Prefs.startMinutes)}"
         endButton.text = "To: ${Format.minutes(Prefs.endMinutes)}"
+
+        val extraNames = Prefs.allowedPackages.map { labelOf(it) }.sorted()
+        allowedSummary.text = if (extraNames.isEmpty()) {
+            "Always allowed: Phone. No other apps allowed."
+        } else {
+            "Always allowed: Phone. Also allowed: ${extraNames.joinToString(", ")}"
+        }
 
         permsColumn.removeAllViews()
         addPerm("Display over other apps", hasOverlay()) {
@@ -277,6 +293,13 @@ class MainActivity : Activity() {
         if (Build.VERSION.SDK_INT < 31) return true
         val am = getSystemService(AlarmManager::class.java) ?: return false
         return am.canScheduleExactAlarms()
+    }
+
+    private fun labelOf(pkg: String): String = try {
+        val pm = packageManager
+        pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString()
+    } catch (_: Throwable) {
+        pkg
     }
 
     // ---------------- actions ----------------
