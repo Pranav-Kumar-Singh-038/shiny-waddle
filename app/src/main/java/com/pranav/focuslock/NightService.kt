@@ -228,6 +228,8 @@ class NightService : Service() {
         if (Build.VERSION.SDK_INT >= 30) {
             params.layoutInDisplayCutoutMode =
                 WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+            // Draw edge-to-edge including the navigation bar area.
+            params.fitInsetsTypes = 0
         }
         try {
             wm?.addView(v, params)
